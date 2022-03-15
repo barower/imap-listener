@@ -59,18 +59,11 @@ fn main() {
     //
     // A threaded client could use channels or shared data to interact with the
     // rest of the program and update mailbox state, decide to exit the IDLE, etc.
-    let mut num_responses = 0;
-    let max_responses = opt.max_responses;
     let idle_result = imap.idle().wait_while(|response| {
-        num_responses += 1;
-        println!("IDLE response #{}: {:?}", num_responses, response);
-        if num_responses >= max_responses {
-            // Stop IDLE
-            false
-        } else {
-            // Continue IDLE
-            true
+        if let imap::types::UnsolicitedResponse::Recent(no) = response {
+            println!("Recorded {} new mails, response: {:?}", no, response);
         }
+        true
     });
 
     match idle_result {
