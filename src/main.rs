@@ -50,26 +50,40 @@ fn main() {
     // from the server and how it is handled in our callback.
     // This wouldn't be turned on in a production build, but is helpful
     // in examples and for debugging.
-    imap.debug = true;
+    imap.debug = false;
 
     imap.select(opt.mailbox).expect("Could not select mailbox");
 
-    // Implement a trivial counter that causes the IDLE callback to end the IDLE
-    // after a fixed number of responses.
-    //
-    // A threaded client could use channels or shared data to interact with the
-    // rest of the program and update mailbox state, decide to exit the IDLE, etc.
-    let idle_result = imap.idle().wait_while(|response| {
-        if let imap::types::UnsolicitedResponse::Recent(no) = response {
-            println!("Recorded {} new mails, response: {:?}", no, response);
-        }
-        true
-    });
+    loop {
+        let idle_result = imap.idle().wait_while(|response| {
+            false
+            //if let imap::types::UnsolicitedResponse::Recent(no) = response {
+            //    println!("Recorded {no} new mails");
+            //    false
+            //} else {
+            //    true
+            //}
+        });
 
-    match idle_result {
-        Ok(reason) => println!("IDLE finished normally {:?}", reason),
-        Err(e) => println!("IDLE finished with error {:?}", e),
+        match idle_result {
+            Ok(reason) => println!("IDLE finished normally {reason:?}"),
+            Err(e) => println!("IDLE finished with error {e:?}"),
+        }
+
+        let search_results = imap.search("UNSEEN").unwrap();
+        println!("Search results: {:?}", &search_results);
+        for result in search_results.iter() {
+            println!("Parsing email of UID {result}");
+            let messages = imap.fetch(result.to_string(), "ENVELOPE").unwrap();
+            if let Some(header) = messages.iter().next() {
+                let subject = std::str::from_utf8(header.envelope().unwrap().subject.as_ref().unwrap()).unwrap();
+                println!("{subject:?}");
+            } else {
+                println!("Header not found :(");
+            }
+        }
+
     }
 
-    imap.logout().expect("Could not log out");
+    //imap.logout().expect("Could not log out");
 }
