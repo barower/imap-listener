@@ -36,6 +36,30 @@ struct Opt {
         max_responses: usize,
 }
 
+fn get_subject(header: &imap::types::Fetch<'_>) -> String {
+    let envelope = header.envelope().unwrap();
+
+    let _subject = envelope.subject.as_ref().unwrap();
+    let subject = String::from_utf8_lossy(_subject);
+    if let Some(decoded_subject) = decode_rfc2047(&subject) {
+        decoded_subject
+    } else {
+        subject.to_string()
+    }
+}
+
+fn get_from(header: &imap::types::Fetch<'_>) -> String {
+    let envelope = header.envelope().unwrap();
+
+    let _from = envelope.from.as_ref().unwrap()[0].name.as_ref().unwrap();
+    let from = String::from_utf8_lossy(_from);
+    if let Some(decoded_from) = decode_rfc2047(&from) {
+        decoded_from
+    } else {
+        from.to_string()
+    }
+}
+
 fn main() {
     let opt = Opt::from_args();
 
@@ -77,23 +101,11 @@ fn main() {
             println!("Parsing email of UID {result}");
             let messages = imap.fetch(result.to_string(), "ENVELOPE").unwrap();
             if let Some(header) = messages.iter().next() {
-                let envelope = header.envelope().unwrap();
+                let subject = get_subject(header);
+                println!("Subject is \"{subject}\"");
 
-                let _subject = envelope.subject.as_ref().unwrap();
-                let subject = String::from_utf8_lossy(_subject);
-                if let Some(decoded_subject) = decode_rfc2047(&subject) {
-                    println!("Subject: {decoded_subject:?}");
-                } else {
-                    println!("Subject: {subject:?}");
-                }
-
-                let _from = envelope.from.as_ref().unwrap()[0].name.as_ref().unwrap();
-                let from = String::from_utf8_lossy(_from);
-                if let Some(decoded_from) = decode_rfc2047(&from) {
-                    println!("From: {decoded_from:?}");
-                } else {
-                    println!("From: {from:?}");
-                }
+                let from = get_from(header);
+                println!("Subject is \"{from}\"");
             } else {
                 println!("Header not found :(");
             }
