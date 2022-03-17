@@ -1,4 +1,5 @@
 use structopt::StructOpt;
+use email::rfc2047::decode_rfc2047;
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "idle")]
@@ -76,8 +77,13 @@ fn main() {
             println!("Parsing email of UID {result}");
             let messages = imap.fetch(result.to_string(), "ENVELOPE").unwrap();
             if let Some(header) = messages.iter().next() {
-                let subject = std::str::from_utf8(header.envelope().unwrap().subject.as_ref().unwrap()).unwrap();
-                println!("{subject:?}");
+                let _subject = header.envelope().unwrap().subject.as_ref().unwrap();
+                let subject = String::from_utf8_lossy(_subject);
+                if let Some(decoded_subject) = decode_rfc2047(&subject) {
+                    println!("{decoded_subject:?}");
+                } else {
+                    println!("{subject:?}");
+                }
             } else {
                 println!("Header not found :(");
             }
