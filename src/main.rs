@@ -56,7 +56,7 @@ fn main() {
     imap.select(opt.mailbox).expect("Could not select mailbox");
 
     loop {
-        let idle_result = imap.idle().wait_while(|response| {
+        let idle_result = imap.idle().wait_while(|_response| {
             false
             //if let imap::types::UnsolicitedResponse::Recent(no) = response {
             //    println!("Recorded {no} new mails");
@@ -77,12 +77,22 @@ fn main() {
             println!("Parsing email of UID {result}");
             let messages = imap.fetch(result.to_string(), "ENVELOPE").unwrap();
             if let Some(header) = messages.iter().next() {
-                let _subject = header.envelope().unwrap().subject.as_ref().unwrap();
+                let envelope = header.envelope().unwrap();
+
+                let _subject = envelope.subject.as_ref().unwrap();
                 let subject = String::from_utf8_lossy(_subject);
                 if let Some(decoded_subject) = decode_rfc2047(&subject) {
-                    println!("{decoded_subject:?}");
+                    println!("Subject: {decoded_subject:?}");
                 } else {
-                    println!("{subject:?}");
+                    println!("Subject: {subject:?}");
+                }
+
+                let _from = envelope.from.as_ref().unwrap()[0].name.as_ref().unwrap();
+                let from = String::from_utf8_lossy(_from);
+                if let Some(decoded_from) = decode_rfc2047(&from) {
+                    println!("From: {decoded_from:?}");
+                } else {
+                    println!("From: {from:?}");
                 }
             } else {
                 println!("Header not found :(");
