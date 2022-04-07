@@ -1,3 +1,4 @@
+use simple_logger::SimpleLogger;
 use structopt::StructOpt;
 use email::rfc2047::decode_rfc2047;
 use email::FromHeader;
@@ -6,6 +7,7 @@ use std::thread;
 use std::process::Command;
 use std::fs::File;
 use std::error::Error;
+use log::{info, trace, warn};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "idle")]
@@ -127,23 +129,25 @@ fn play_notification_sound() {
         if let Ok(mut child) = Command::new("play").arg(opt.audio_file).spawn() {
             child.wait().expect("Command wasn't running");
         } else {
-            println!("Failed to run command");
+            warn!("Failed to run command");
         }
     });
 }
 
 fn main() {
+    SimpleLogger::new().init().unwrap();
+
     'connect: loop {
         let opt = Opt::from_args();
 
-        println!("Trying to log in to mailbox");
+        info!("Trying to log in to mailbox");
 
         let client = match imap::ClientBuilder::new(opt.server.clone(), opt.port).native_tls() {
             Ok(client) => client,
             Err(e) => {
                 let dur: std::time::Duration = std::time::Duration::from_secs(opt.refresh_rate);
-                println!("Failed to create ClientBuilder: {e:?}");
-                println!("Waiting {}s to reconnect", &opt.refresh_rate);
+                info!("Failed to create ClientBuilder: {e:?}");
+                info!("Waiting {}s to reconnect", &opt.refresh_rate);
                 std::thread::sleep(dur);
                 continue 'connect;
             },
@@ -153,8 +157,8 @@ fn main() {
             Ok(imap) => imap,
             Err(e) => {
                 let dur: std::time::Duration = std::time::Duration::from_secs(opt.refresh_rate);
-                println!("Failed to login: {e:?}");
-                println!("Waiting {}s to reconnect", &opt.refresh_rate);
+                info!("Failed to login: {e:?}");
+                info!("Waiting {}s to reconnect", &opt.refresh_rate);
                 std::thread::sleep(dur);
                 continue 'connect;
             },
@@ -172,17 +176,17 @@ fn main() {
 
             let search_results = match imap.search("UNSEEN") {
                 Ok(search_results) => {
-                    println!("Search results: {:?}", &search_results);
+                    trace!("Search results: {:?}", &search_results);
                     search_results
                 },
                 Err(e) => {
-                    println!("Failed to fetch emails: {e:?}");
+                    info!("Failed to fetch emails: {e:?}");
                     continue 'connect;
                 }
             };
 
             for mail_uid in search_results.iter() {
-                println!("Parsing email of UID {mail_uid}");
+                trace!("Parsing email of UID {mail_uid}");
                 let messages = imap.fetch(mail_uid.to_string(), "ENVELOPE").unwrap();
                 if let Some(header) = messages.iter().next() {
                     let date = get_date(header);
@@ -195,17 +199,17 @@ fn main() {
                     if person_allowed(&from, &allowed_people) && subject_is_triggering(&subject, &triggering_subjects) {
                         move_email(&mut imap, *mail_uid, "Jedzenie");
                         if !mail_too_old(date, opt.mail_expiration_secs) {
-                            println!("New mail from {from}: \"{subject}\"");
+                            trace!("New mail from {from}: \"{subject}\"");
                             play_notification_sound();
                         }
                         continue 'fetch_mails; // search for mails again, because mail uid's are at this point invalid
                     }
                 } else {
-                    println!("Header not found :(");
+                    warn!("Header not found :(");
                 }
             }
 
-            println!("Waiting for something to arrive");
+            trace!("Waiting for something to arrive");
 
             let dur: std::time::Duration = std::time::Duration::from_secs(opt.refresh_rate);
 
@@ -214,9 +218,9 @@ fn main() {
             });
 
             match idle_result {
-                Ok(reason) => println!("IDLE finished normally {reason:?}"),
+                Ok(reason) => trace!("IDLE finished normally {reason:?}"),
                 Err(e) => {
-                    println!("IDLE finished with error: {e:?}");
+                    info!("IDLE finished with error: {e:?}");
                     continue 'connect;
                 }
             }
