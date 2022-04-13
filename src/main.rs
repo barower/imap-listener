@@ -213,6 +213,7 @@ fn main() {
 
             let dur: std::time::Duration = std::time::Duration::from_secs(opt.refresh_rate);
 
+            // TODO: why this sometimes get stuck?
             let idle_result = imap.idle().timeout(dur).wait_while(|_response| {
                 false
             });
